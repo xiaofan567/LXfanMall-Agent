@@ -4,32 +4,41 @@
 
 ## 架构
 
-```
-                    ┌─────────────────┐
-                    │   Nginx (80)    │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              ▼              ▼              ▼
-    ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-    │ mall-portal  │ │  mall-admin  │ │ mall-search  │
-    │ 前台 API     │ │ 后台管理 API │ │ ES 搜索服务  │
-    │ (8085)       │ │ (8080)       │ │ (8081)       │
-    └──────┬───────┘ └──────┬───────┘ └──────┬───────┘
-           │                │                │
-           └────────────────┼────────────────┘
-                            │
-              ┌─────────────┼─────────────┐
-              ▼             ▼             ▼
-    ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-    │  mall-mbg    │ │ mall-security│ │  mall-common │
-    │  数据访问层   │ │  认证授权    │ │  公共工具     │
-    └──────────────┘ └──────────────┘ └──────────────┘
-              │
-              ▼
-    ┌──────────────┐ ┌──────────────┐
-    │    MySQL     │ │    Redis     │
-    └──────────────┘ └──────────────┘
+```mermaid
+graph TB
+    Nginx[Nginx<br/>端口 80]
+    
+    subgraph API["API 服务层"]
+        Portal[mall-portal<br/>前台 API<br/>端口 8085]
+        Admin[mall-admin<br/>后台管理 API<br/>端口 8080]
+        Search[mall-search<br/>ES 搜索服务<br/>端口 8081]
+    end
+    
+    subgraph Core["核心模块"]
+        MBG[mall-mbg<br/>数据访问层]
+        Security[mall-security<br/>JWT 认证授权]
+        Common[mall-common<br/>公共工具类]
+    end
+    
+    subgraph Storage["存储层"]
+        MySQL[(MySQL 5.7)]
+        Redis[(Redis 7)]
+        ES[(Elasticsearch)]
+    end
+    
+    Nginx --> Portal
+    Nginx --> Admin
+    Nginx --> Search
+    
+    Portal --> MBG
+    Admin --> MBG
+    Search --> ES
+    
+    Security --> Portal
+    Security --> Admin
+    
+    MBG --> MySQL
+    MBG --> Redis
 ```
 
 ## 子模块说明

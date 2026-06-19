@@ -6,69 +6,89 @@
 
 ## 系统架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        用户浏览器                             │
-└──────────┬──────────────────────────────┬───────────────────┘
-           │                              │
-           ▼                              ▼
-┌─────────────────────┐     ┌─────────────────────────┐
-│  LXfanMallWeb       │     │  mall-admin-web          │
-│  React + TS + Vite   │     │  Vue 3 + Element Plus    │
-│  端口: 8085          │     │  端口: 8080               │
-│  - 商品浏览/搜索      │     │  - 商品/订单管理           │
-│  - 购物车/订单        │     │  - 数据看板               │
-│  - AI 对话 (SSE)     │     │  - Token 用量统计         │
-└──────────┬──────────┘     └───────────┬─────────────┘
-           │                            │
-           ▼                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    mall (Java 后端)                          │
-│                  Spring Boot 多模块架构                       │
-│                                                             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │ mall-    │ │ mall-    │ │ mall-    │ │ mall-    │       │
-│  │ portal   │ │ admin    │ │ search   │ │ security │       │
-│  │ 前台API  │ │ 后台API  │ │ ES搜索   │ │ JWT认证  │       │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘       │
-│       └────────────┼───────────┼─────────────┘              │
-│                    ▼           ▼                             │
-│             ┌──────────┐ ┌──────────┐                       │
-│             │ mall-mbg │ │ mall-    │                       │
-│             │ 数据访问  │ │ common   │                       │
-│             └──────────┘ │ 公共模块  │                       │
-│                          └──────────┘                       │
-└─────────────┬───────────────────────┬───────────────────────┘
-              │                       │
-              ▼                       ▼
-┌──────────────────┐     ┌─────────────────────────┐
-│    MySQL 5.7     │     │    Redis 7              │
-│    商品/订单/用户  │     │    缓存/Session/购物车    │
-└──────────────────┘     └─────────────────────────┘
+### 整体架构
 
-┌─────────────────────────────────────────────────────────────┐
-│              agent-service (Python AI Agent)                 │
-│              FastAPI + LangChain + LangGraph                 │
-│                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │  LangGraph   │  │  工具调用     │  │  对话记忆     │       │
-│  │  有向图工作流  │  │  商品/订单/   │  │  Session +   │       │
-│  │  意图分类→    │  │  购物车/评价  │  │  用户画像     │       │
-│  │  节点路由→    │  │              │  │              │       │
-│  │  工具执行     │  └──────────────┘  └──────────────┘       │
-│  └──────────────┘                                           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │  RAG 引擎    │  │  文档解析     │  │  安全防护     │       │
-│  │  Milvus 向量  │  │  PDF/Word/   │  │  速率限制     │       │
-│  │  检索 + 重排  │  │  Excel/HTML  │  │  注入防护     │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-└─────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌──────────────────┐  ┌──────────────────┐
-│    Milvus        │  │    DeepSeek API  │
-│    向量数据库      │  │    LLM 推理      │
-└──────────────────┘  └──────────────────┘
+```mermaid
+graph TB
+    Browser[用户浏览器]
+    
+    subgraph 前端
+        Web[LXfanMallWeb<br/>React + TypeScript<br/>端口 8085]
+        Admin[mall-admin-web<br/>Vue 3 + Element Plus<br/>端口 8080]
+    end
+    
+    subgraph 后端["mall (Java 后端 - Spring Boot 多模块)"]
+        Portal[mall-portal<br/>前台 API]
+        AdminAPI[mall-admin<br/>后台 API]
+        Search[mall-search<br/>ES 搜索]
+        Security[mall-security<br/>JWT 认证]
+        MBG[mall-mbg<br/>数据访问]
+        Common[mall-common<br/>公共模块]
+    end
+    
+    subgraph AI["agent-service (Python AI Agent)"]
+        Agent[LangGraph 工作流<br/>意图分类 / 工具调用]
+        RAG[RAG 引擎<br/>向量检索 / 重排序]
+        Memory[对话记忆<br/>Session / 用户画像]
+    end
+    
+    subgraph 存储
+        MySQL[(MySQL 5.7)]
+        Redis[(Redis 7)]
+        Milvus[(Milvus<br/>向量数据库)]
+        ES[(Elasticsearch)]
+    end
+    
+    subgraph 外部
+        DeepSeek[DeepSeek API<br/>LLM 推理]
+        Qwen[Qwen Embedding<br/>文本向量化]
+    end
+    
+    Browser --> Web
+    Browser --> Admin
+    Web --> Portal
+    Web -->|SSE 流式| Agent
+    Admin --> AdminAPI
+    Admin -->|直连| Agent
+    
+    Portal --> MBG
+    AdminAPI --> MBG
+    Search --> ES
+    Security --> Portal
+    Security --> AdminAPI
+    MBG --> MySQL
+    MBG --> Redis
+    
+    Agent --> Portal
+    Agent --> Search
+    Agent --> RAG
+    Agent --> DeepSeek
+    RAG --> Milvus
+    RAG --> Qwen
+```
+
+### AI Agent 工作流
+
+```mermaid
+graph TD
+    User[用户消息] --> Classify[意图分类<br/>LLM]
+    
+    Classify -->|product_recommend| Product[商品推荐<br/>search_product 工具]
+    Classify -->|order_query| Order[订单查询<br/>get_order_list 工具]
+    Classify -->|cart_op| Cart[购物车操作<br/>add_to_cart 工具]
+    Classify -->|knowledge_query| RAG[RAG 检索<br/>Milvus + Reranker]
+    Classify -->|chitchat| Chat[闲聊<br/>直接回复]
+    
+    Product --> ToolResult[工具执行结果]
+    Order --> ToolResult
+    Cart --> ToolResult
+    
+    ToolResult --> Generate[回复生成<br/>LLM]
+    RAG --> Generate
+    Chat --> Generate
+    
+    Generate --> SSE[SSE 流式输出<br/>前端实时展示]
+    Generate --> Token[Token 用量上报<br/>ums_token_usage 表]
 ```
 
 ## 核心功能

@@ -4,30 +4,34 @@
 
 ## 架构概览
 
-```
-用户消息
-   │
-   ▼
-┌─────────────────────────────────────────────────┐
-│                 FastAPI 接口层                    │
-│  /api/v1/chat (SSE 流式)  /api/v1/rag            │
-└──────────────────────┬──────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────┐
-│              LangGraph 工作流引擎                 │
-│                                                  │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐   │
-│  │ 意图分类  │───▶│ 节点路由  │───▶│ 工具执行  │   │
-│  │ (LLM)    │    │ (Router) │    │ (Tools)  │   │
-│  └──────────┘    └────┬─────┘    └──────────┘   │
-│                       │                          │
-│                       ▼                          │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐   │
-│  │ RAG 检索  │    │ 回复生成  │    │ 对话记忆  │   │
-│  │ (Milvus) │◀──│ (LLM)   │───▶│ (Redis)  │   │
-│  └──────────┘    └──────────┘    └──────────┘   │
-└─────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    User[用户消息] --> API[FastAPI 接口层<br/>/api/v1/chat SSE 流式<br/>/api/v1/rag]
+    
+    API --> Agent[LangGraph 工作流引擎]
+    
+    Agent --> Classify[意图分类<br/>LLM]
+    Classify --> Router[节点路由]
+    Router --> Tools[工具执行<br/>商品/订单/购物车]
+    Router --> RAG[RAG 检索<br/>Milvus 向量检索]
+    Router --> Reply[回复生成<br/>LLM]
+    
+    Tools --> Reply
+    RAG --> Reply
+    
+    Reply --> Memory[对话记忆<br/>Redis Session]
+    Reply --> Output[SSE 流式输出]
+    
+    subgraph 外部服务
+        Milvus[(Milvus)]
+        DeepSeek[DeepSeek API]
+        JavaAPI[Java 后端 API]
+    end
+    
+    RAG --> Milvus
+    Classify --> DeepSeek
+    Reply --> DeepSeek
+    Tools --> JavaAPI
 ```
 
 ## 目录结构
