@@ -73,15 +73,18 @@
 
 ## 核心功能
 
-### AI Agent（本人独立开发）
+### AI Agent（独立开发）
 
 - **LangGraph 有向图工作流**：意图分类 → 节点路由 → 工具调用 → 结果整合
 - **工具调用**：商品搜索、订单查询、购物车操作、商品评价等电商工具
 - **RAG 检索增强**：支持 PDF/Word/Excel/HTML/Markdown 多格式文档解析，Milvus 向量检索 + 重排序
+![RAG 知识库](document/resource/image.png)
+![RAG 文档管理](document/resource/image-1.png)
 - **多轮对话记忆**：基于 session 的会话历史管理
 - **用户画像**：行为分析与个性化推荐
 - **SSE 流式输出**：前端实时展示 AI 回复
 - **Token 用量统计**：采集每次对话的 token 消耗，上报到后端看板
+![Token 用量统计](document/resource/image-2.png)
 - **安全防护**：速率限制、破坏性操作确认、Milvus 注入防护、admin 权限校验
 
 ### 电商平台（基于 macrozheng/mall 二次开发）
@@ -92,6 +95,8 @@
 - **评价系统**：商品评价、星级评分
 - **管理后台**：数据看板、商品/订单/营销管理
 - **用户系统**：JWT 认证、阿里云号码认证、收货地址管理
+- **智能客服系统**：基于 AI Agent 实现智能客服，处理用户咨询、订单查询等
+![智能客服](document/resource/image-3.png)
 
 ## 技术栈
 
