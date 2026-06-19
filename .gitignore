@@ -1,0 +1,42 @@
+# ============ Environment & Secrets ============
+.env
+.env.local
+.env.*
+
+# ============ IDE ============
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# ============ Java (Maven) ============
+target/
+*.class
+*.jar
+*.war
+
+# ============ Node.js ============
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+*.egg
+
+# ============ OS ============
+.DS_Store
+Thumbs.db
+
+# ============ Logs ============
+*.log
+
+# ============ Project-specific ============
+.claude/
+CLAUDE.md
+mall/document/docker/data/
