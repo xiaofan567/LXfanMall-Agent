@@ -61,7 +61,9 @@ async def rate_limit_handler(_request: Request, exc: RateLimitExceeded):
 # 开发环境白名单：前端 dev server + mall-portal 代理
 _CORS_ORIGINS = [
     "http://localhost:5173",   # Vite dev server (LXfanMallWeb)
+    "http://localhost:5174",   # Vite dev server (mall-admin-web)
     "http://localhost:8085",   # mall-portal（前端生产代理）
+    "http://localhost:8090",   # mall-admin-web 生产代理
     "http://localhost:3000",   # 备用前端端口
 ]
 

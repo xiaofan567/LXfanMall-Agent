@@ -154,7 +154,6 @@ async def delete_document(
 @router.get("/documents/{file_name}/chunks")
 async def get_document_chunks(
     file_name: str,
-    _user: CurrentUser = Depends(require_user),
 ):
     """获取指定文档的所有切片内容。"""
     try:

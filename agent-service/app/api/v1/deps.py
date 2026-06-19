@@ -28,18 +28,35 @@ class CurrentUser:
 
 
 def _try_decode_token(token: str, secrets: list[str], algorithm: str) -> dict | None:
-    """尝试用多个 secret 解码 JWT，返回第一个成功的 payload。"""
-    for secret in secrets:
-        try:
-            # Java JJWT 的 setSigningKey(String) 会先尝试 base64 解码
-            try:
-                signing_key = base64.b64decode(secret)
-            except Exception:
-                signing_key = secret
+    """尝试用多个 secret 解码 JWT，返回第一个成功的 payload。
 
-            return jwt.decode(token, signing_key, algorithms=[algorithm])
-        except JWTError:
-            continue
+    Java JJWT 0.9.1 的 TextCodec.BASE64.decode 比 Python base64 更宽松，
+    因此对每个 secret 同时尝试 base64 解码和原始字符串两种方式。
+    """
+    logger.info("JWT 验签开始 | token=%s...%s | algorithm=%s | secrets=%s",
+                token[:20], token[-10:], algorithm, [s[:10]+"..." for s in secrets])
+
+    for secret in secrets:
+        # 构造候选 key 列表：base64 解码 + 原始字符串（去重）
+        candidate_keys: list[tuple[str, bytes]] = []
+        try:
+            decoded = base64.b64decode(secret)
+            candidate_keys.append(("base64", decoded))
+        except Exception:
+            pass
+        candidate_keys.append(("raw", secret.encode("utf-8")))
+
+        for key_type, key in candidate_keys:
+            try:
+                payload = jwt.decode(token, key, algorithms=[algorithm])
+                logger.info("JWT 验签成功 | secret='%s' key_type=%s", secret, key_type)
+                return payload
+            except JWTError as e:
+                logger.info("JWT 验签失败 | secret='%s' key_type=%s error=%s", secret, key_type, str(e)[:100])
+                continue
+
+    logger.warning("JWT 验签失败（已尝试 %d 个 secret，共 %d 种 key）",
+                   len(secrets), sum(2 for _ in secrets))
     return None
 
 
@@ -67,7 +84,6 @@ async def get_optional_user(
 
     payload = _try_decode_token(token, secrets, settings.jwt_algorithm)
     if payload is None:
-        logger.warning("JWT 验签失败（已尝试 %d 个 secret）", len(secrets))
         return None
 
     username = payload.get("sub")
