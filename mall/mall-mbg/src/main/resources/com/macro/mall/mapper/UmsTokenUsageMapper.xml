@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.mapper.UmsTokenUsageMapper">
+  <resultMap id="BaseResultMap" type="com.macro.mall.model.UmsTokenUsage">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="username" jdbcType="VARCHAR" property="username" />
+    <result column="session_id" jdbcType="VARCHAR" property="sessionId" />
+    <result column="intent" jdbcType="VARCHAR" property="intent" />
+    <result column="model" jdbcType="VARCHAR" property="model" />
+    <result column="prompt_tokens" jdbcType="INTEGER" property="promptTokens" />
+    <result column="completion_tokens" jdbcType="INTEGER" property="completionTokens" />
+    <result column="total_tokens" jdbcType="INTEGER" property="totalTokens" />
+    <result column="tool_calls" jdbcType="INTEGER" property="toolCalls" />
+    <result column="latency_ms" jdbcType="INTEGER" property="latencyMs" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, username, session_id, intent, model, prompt_tokens, completion_tokens, total_tokens, 
+    tool_calls, latency_ms, create_time
+  </sql>
+  <select id="selectByExample" parameterType="com.macro.mall.model.UmsTokenUsageExample" resultMap="BaseResultMap">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    from ums_token_usage
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from ums_token_usage
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+    delete from ums_token_usage
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="com.macro.mall.model.UmsTokenUsageExample">
+    delete from ums_token_usage
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="com.macro.mall.model.UmsTokenUsage">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into ums_token_usage (username, session_id, intent, 
+      model, prompt_tokens, completion_tokens, 
+      total_tokens, tool_calls, latency_ms, 
+      create_time)
+    values (#{username,jdbcType=VARCHAR}, #{sessionId,jdbcType=VARCHAR}, #{intent,jdbcType=VARCHAR}, 
+      #{model,jdbcType=VARCHAR}, #{promptTokens,jdbcType=INTEGER}, #{completionTokens,jdbcType=INTEGER}, 
+      #{totalTokens,jdbcType=INTEGER}, #{toolCalls,jdbcType=INTEGER}, #{latencyMs,jdbcType=INTEGER}, 
+      #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.macro.mall.model.UmsTokenUsage">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into ums_token_usage
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="username != null">
+        username,
+      </if>
+      <if test="sessionId != null">
+        session_id,
+      </if>
+      <if test="intent != null">
+        intent,
+      </if>
+      <if test="model != null">
+        model,
+      </if>
+      <if test="promptTokens != null">
+        prompt_tokens,
+      </if>
+      <if test="completionTokens != null">
+        completion_tokens,
+      </if>
+      <if test="totalTokens != null">
+        total_tokens,
+      </if>
+      <if test="toolCalls != null">
+        tool_calls,
+      </if>
+      <if test="latencyMs != null">
+        latency_ms,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="username != null">
+        #{username,jdbcType=VARCHAR},
+      </if>
+      <if test="sessionId != null">
+        #{sessionId,jdbcType=VARCHAR},
+      </if>
+      <if test="intent != null">
+        #{intent,jdbcType=VARCHAR},
+      </if>
+      <if test="model != null">
+        #{model,jdbcType=VARCHAR},
+      </if>
+      <if test="promptTokens != null">
+        #{promptTokens,jdbcType=INTEGER},
+      </if>
+      <if test="completionTokens != null">
+        #{completionTokens,jdbcType=INTEGER},
+      </if>
+      <if test="totalTokens != null">
+        #{totalTokens,jdbcType=INTEGER},
+      </if>
+      <if test="toolCalls != null">
+        #{toolCalls,jdbcType=INTEGER},
+      </if>
+      <if test="latencyMs != null">
+        #{latencyMs,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="com.macro.mall.model.UmsTokenUsageExample" resultType="java.lang.Long">
+    select count(*) from ums_token_usage
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update ums_token_usage
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.username != null">
+        username = #{row.username,jdbcType=VARCHAR},
+      </if>
+      <if test="row.sessionId != null">
+        session_id = #{row.sessionId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.intent != null">
+        intent = #{row.intent,jdbcType=VARCHAR},
+      </if>
+      <if test="row.model != null">
+        model = #{row.model,jdbcType=VARCHAR},
+      </if>
+      <if test="row.promptTokens != null">
+        prompt_tokens = #{row.promptTokens,jdbcType=INTEGER},
+      </if>
+      <if test="row.completionTokens != null">
+        completion_tokens = #{row.completionTokens,jdbcType=INTEGER},
+      </if>
+      <if test="row.totalTokens != null">
+        total_tokens = #{row.totalTokens,jdbcType=INTEGER},
+      </if>
+      <if test="row.toolCalls != null">
+        tool_calls = #{row.toolCalls,jdbcType=INTEGER},
+      </if>
+      <if test="row.latencyMs != null">
+        latency_ms = #{row.latencyMs,jdbcType=INTEGER},
+      </if>
+      <if test="row.createTime != null">
+        create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update ums_token_usage
+    set id = #{row.id,jdbcType=BIGINT},
+      username = #{row.username,jdbcType=VARCHAR},
+      session_id = #{row.sessionId,jdbcType=VARCHAR},
+      intent = #{row.intent,jdbcType=VARCHAR},
+      model = #{row.model,jdbcType=VARCHAR},
+      prompt_tokens = #{row.promptTokens,jdbcType=INTEGER},
+      completion_tokens = #{row.completionTokens,jdbcType=INTEGER},
+      total_tokens = #{row.totalTokens,jdbcType=INTEGER},
+      tool_calls = #{row.toolCalls,jdbcType=INTEGER},
+      latency_ms = #{row.latencyMs,jdbcType=INTEGER},
+      create_time = #{row.createTime,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="com.macro.mall.model.UmsTokenUsage">
+    update ums_token_usage
+    <set>
+      <if test="username != null">
+        username = #{username,jdbcType=VARCHAR},
+      </if>
+      <if test="sessionId != null">
+        session_id = #{sessionId,jdbcType=VARCHAR},
+      </if>
+      <if test="intent != null">
+        intent = #{intent,jdbcType=VARCHAR},
+      </if>
+      <if test="model != null">
+        model = #{model,jdbcType=VARCHAR},
+      </if>
+      <if test="promptTokens != null">
+        prompt_tokens = #{promptTokens,jdbcType=INTEGER},
+      </if>
+      <if test="completionTokens != null">
+        completion_tokens = #{completionTokens,jdbcType=INTEGER},
+      </if>
+      <if test="totalTokens != null">
+        total_tokens = #{totalTokens,jdbcType=INTEGER},
+      </if>
+      <if test="toolCalls != null">
+        tool_calls = #{toolCalls,jdbcType=INTEGER},
+      </if>
+      <if test="latencyMs != null">
+        latency_ms = #{latencyMs,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.macro.mall.model.UmsTokenUsage">
+    update ums_token_usage
+    set username = #{username,jdbcType=VARCHAR},
+      session_id = #{sessionId,jdbcType=VARCHAR},
+      intent = #{intent,jdbcType=VARCHAR},
+      model = #{model,jdbcType=VARCHAR},
+      prompt_tokens = #{promptTokens,jdbcType=INTEGER},
+      completion_tokens = #{completionTokens,jdbcType=INTEGER},
+      total_tokens = #{totalTokens,jdbcType=INTEGER},
+      tool_calls = #{toolCalls,jdbcType=INTEGER},
+      latency_ms = #{latencyMs,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

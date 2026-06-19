@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.portal.dao.PortalOrderLogisticsDao">
+
+    <select id="getLogisticsTrace" resultType="com.macro.mall.portal.domain.LogisticsTraceResult">
+        SELECT trace_time AS traceTime,
+               location,
+               status_text AS statusText,
+               status_code AS statusCode
+        FROM oms_logistics_trace
+        WHERE order_id = #{orderId}
+        ORDER BY status_code ASC
+    </select>
+
+    <select id="getMaxStatusCode" resultType="java.lang.Integer">
+        SELECT MAX(status_code)
+        FROM oms_logistics_trace
+        WHERE order_id = #{orderId}
+    </select>
+
+    <insert id="insertTrace">
+        INSERT INTO oms_logistics_trace (order_id, delivery_sn, trace_time, location, status_text, status_code, create_time)
+        VALUES (#{orderId}, #{deliverySn}, #{traceTime}, #{location}, #{statusText}, #{statusCode}, NOW())
+    </insert>
+
+</mapper>

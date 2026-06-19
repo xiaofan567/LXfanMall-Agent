@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.dao.HomeDao">
+
+    <!-- 首页汇总统计：订单数、销售额、各状态订单数、同比数据 -->
+    <select id="getSummary" resultType="com.macro.mall.dto.HomeSummaryResult">
+        SELECT
+            -- 今日订单总数
+            SUM(CASE WHEN DATE(create_time) = CURDATE() THEN 1 ELSE 0 END) AS todayOrderCount,
+            -- 今日销售总额（已支付订单）
+            IFNULL(SUM(CASE WHEN DATE(payment_time) = CURDATE() THEN pay_amount ELSE 0 END), 0) AS todaySales,
+            -- 昨日销售总额
+            IFNULL(SUM(CASE WHEN DATE(payment_time) = CURDATE() - INTERVAL 1 DAY THEN pay_amount ELSE 0 END), 0) AS yesterdaySales,
+
+            -- 各状态订单数
+            SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS pendingPaymentCount,
+            SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS completedOrderCount,
+            SUM(CASE WHEN status = 7 THEN 1 ELSE 0 END) AS deliveredOrderCount,
+            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS pendingShipmentCount,
+            SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) AS shippedOrderCount,
+
+            -- 本月订单总数
+            SUM(CASE WHEN create_time >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 ELSE 0 END) AS monthlyOrderCount,
+            -- 本周订单总数 (YEARWEEK mode 1: 周一为一周起始)
+            SUM(CASE WHEN YEARWEEK(create_time, 1) = YEARWEEK(NOW(), 1) THEN 1 ELSE 0 END) AS weeklyOrderCount,
+            -- 本月销售总额
+            IFNULL(SUM(CASE WHEN payment_time >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN pay_amount ELSE 0 END), 0) AS monthlySales,
+            -- 本周销售总额
+            IFNULL(SUM(CASE WHEN YEARWEEK(payment_time, 1) = YEARWEEK(NOW(), 1) THEN pay_amount ELSE 0 END), 0) AS weeklySales,
+
+            -- 上月订单总数（同比用）
+            SUM(CASE WHEN create_time >= DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01')
+                      AND create_time &lt; DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 ELSE 0 END) AS lastMonthOrderCount,
+            -- 上周订单总数
+            SUM(CASE WHEN YEARWEEK(create_time, 1) = YEARWEEK(NOW(), 1) - 1 THEN 1 ELSE 0 END) AS lastWeekOrderCount,
+            -- 上月销售总额
+            IFNULL(SUM(CASE WHEN payment_time >= DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01')
+                             AND payment_time &lt; DATE_FORMAT(NOW(), '%Y-%m-01') THEN pay_amount ELSE 0 END), 0) AS lastMonthSales,
+            -- 上周销售总额
+            IFNULL(SUM(CASE WHEN YEARWEEK(payment_time, 1) = YEARWEEK(NOW(), 1) - 1 THEN pay_amount ELSE 0 END), 0) AS lastWeekSales
+        FROM oms_order
+        WHERE delete_status = 0
+    </select>
+
+    <!-- 折线图数据：按日期分组的订单数和金额 -->
+    <select id="getChartData" resultType="com.macro.mall.dto.HomeChartResult">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d') AS date,
+            COUNT(*) AS orderCount,
+            IFNULL(SUM(pay_amount), 0) AS orderAmount
+        FROM oms_order
+        WHERE delete_status = 0
+          AND create_time >= #{startDate}
+          AND create_time &lt; DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY date ASC
+    </select>
+
+    <!-- 商品总览 -->
+    <select id="getProductOverview" resultType="com.macro.mall.dto.HomeProductOverview">
+        SELECT
+            SUM(CASE WHEN publish_status = 0 AND delete_status = 0 THEN 1 ELSE 0 END) AS delistedCount,
+            SUM(CASE WHEN publish_status = 1 AND delete_status = 0 THEN 1 ELSE 0 END) AS listedCount,
+            SUM(CASE WHEN stock &lt; 10 AND delete_status = 0 THEN 1 ELSE 0 END) AS lowStockCount,
+            SUM(CASE WHEN delete_status = 0 THEN 1 ELSE 0 END) AS totalCount
+        FROM pms_product
+    </select>
+
+    <!-- 用户总览 -->
+    <select id="getMemberOverview" resultType="com.macro.mall.dto.HomeMemberOverview">
+        SELECT
+            SUM(CASE WHEN DATE(create_time) = CURDATE() THEN 1 ELSE 0 END) AS todayNewCount,
+            SUM(CASE WHEN DATE(create_time) = CURDATE() - INTERVAL 1 DAY THEN 1 ELSE 0 END) AS yesterdayNewCount,
+            SUM(CASE WHEN create_time >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 ELSE 0 END) AS monthNewCount,
+            COUNT(*) AS totalCount
+        FROM ums_member
+    </select>
+
+    <!-- 待处理退款申请数 (status=0 待处理) -->
+    <select id="getPendingRefundCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM oms_order_return_apply WHERE status = 0
+    </select>
+
+    <!-- 待处理退货订单数 (status=1 退货中) -->
+    <select id="getPendingReturnCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM oms_order_return_apply WHERE status = 1
+    </select>
+
+    <!-- 即将到期广告位数 (上线状态且7天内到期) -->
+    <select id="getAdExpiringCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM sms_home_advertise
+        WHERE status = 1 AND end_time BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)
+    </select>
+
+</mapper>

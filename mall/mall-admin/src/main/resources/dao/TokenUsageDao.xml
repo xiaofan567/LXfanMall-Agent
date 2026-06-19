@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.dao.TokenUsageDao">
+
+    <!-- 插入Token用量记录 -->
+    <insert id="insert">
+        INSERT INTO ums_token_usage (username, session_id, intent, model, prompt_tokens, completion_tokens, total_tokens, tool_calls, latency_ms)
+        VALUES (#{username}, #{sessionId}, #{intent}, #{model}, #{promptTokens}, #{completionTokens}, #{totalTokens}, #{toolCalls}, #{latencyMs})
+    </insert>
+
+    <!-- 汇总统计 -->
+    <select id="getSummary" resultType="com.macro.mall.dto.TokenUsageSummaryResult">
+        SELECT
+            -- 今日
+            IFNULL(SUM(CASE WHEN DATE(create_time) = CURDATE() THEN total_tokens ELSE 0 END), 0) AS todayTotalTokens,
+            SUM(CASE WHEN DATE(create_time) = CURDATE() THEN 1 ELSE 0 END) AS todayRequestCount,
+            -- 本周
+            IFNULL(SUM(CASE WHEN YEARWEEK(create_time, 1) = YEARWEEK(NOW(), 1) THEN total_tokens ELSE 0 END), 0) AS weeklyTotalTokens,
+            SUM(CASE WHEN YEARWEEK(create_time, 1) = YEARWEEK(NOW(), 1) THEN 1 ELSE 0 END) AS weeklyRequestCount,
+            -- 本月
+            IFNULL(SUM(CASE WHEN create_time >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN total_tokens ELSE 0 END), 0) AS monthlyTotalTokens,
+            SUM(CASE WHEN create_time >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 ELSE 0 END) AS monthlyRequestCount,
+            -- 本月活跃用户数
+            COUNT(DISTINCT CASE WHEN create_time >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN username END) AS monthlyActiveUsers,
+            -- 总计
+            IFNULL(SUM(total_tokens), 0) AS totalTokens,
+            COUNT(*) AS totalRequestCount,
+            COUNT(DISTINCT username) AS totalUsers
+        FROM ums_token_usage
+    </select>
+
+    <!-- 今日平均每次请求Token数（单独计算，避免主查询复杂化） -->
+    <!-- 合并到 getSummary 中通过 Java 层计算 -->
+
+    <!-- 折线图数据：按日期分组 -->
+    <select id="getChartData" resultType="com.macro.mall.dto.TokenUsageChartResult">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d') AS date,
+            IFNULL(SUM(total_tokens), 0) AS totalTokens,
+            COUNT(*) AS requestCount
+        FROM ums_token_usage
+        WHERE create_time >= #{startDate}
+          AND create_time &lt; DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY date ASC
+    </select>
+
+    <!-- 用户排行 Top N -->
+    <select id="getUserRanking" resultType="com.macro.mall.dto.TokenUsageRankingResult">
+        SELECT
+            username,
+            IFNULL(SUM(total_tokens), 0) AS totalTokens,
+            COUNT(*) AS requestCount
+        FROM ums_token_usage
+        GROUP BY username
+        ORDER BY totalTokens DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 意图分布 -->
+    <select id="getIntentDistribution" resultType="com.macro.mall.dto.TokenUsageIntentResult">
+        SELECT
+            IFNULL(intent, 'unknown') AS intent,
+            IFNULL(SUM(total_tokens), 0) AS totalTokens,
+            COUNT(*) AS requestCount
+        FROM ums_token_usage
+        GROUP BY intent
+        ORDER BY totalTokens DESC
+    </select>
+
+    <!-- 分页查询明细 -->
+    <select id="getList" resultType="com.macro.mall.dto.TokenUsageDetailResult">
+        SELECT id, username, session_id AS sessionId, intent, model,
+               prompt_tokens AS promptTokens, completion_tokens AS completionTokens,
+               total_tokens AS totalTokens, tool_calls AS toolCalls,
+               latency_ms AS latencyMs, create_time AS createTime
+        FROM ums_token_usage
+        <where>
+            <if test="username != null and username != ''">
+                AND username = #{username}
+            </if>
+            <if test="intent != null and intent != ''">
+                AND intent = #{intent}
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND create_time >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND create_time &lt; DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 明细总数 -->
+    <select id="getListCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM ums_token_usage
+        <where>
+            <if test="username != null and username != ''">
+                AND username = #{username}
+            </if>
+            <if test="intent != null and intent != ''">
+                AND intent = #{intent}
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND create_time >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND create_time &lt; DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+            </if>
+        </where>
+    </select>
+
+</mapper>
