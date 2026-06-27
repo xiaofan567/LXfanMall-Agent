@@ -139,6 +139,15 @@ class ConfirmActionResponse(BaseModel):
     tool_result: dict | None = Field(None, description="工具返回的结构化数据")
 
 
+class UpdatePendingActionRequest(BaseModel):
+    """更新待确认操作状态的请求（前端确认后持久化状态用）。"""
+
+    session_id: str = Field(..., min_length=1, description="会话 ID")
+    action_id: str = Field(..., min_length=1, description="待确认操作的 ID")
+    status: str = Field(..., description="确认状态：confirmed / cancelled / error")
+    result_message: str = Field("", description="执行结果消息")
+
+
 # ── 健康检查 ─────────────────────────────────────────
 
 class HealthResponse(BaseModel):

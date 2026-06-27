@@ -50,6 +50,7 @@ from app.models.schemas import (
     OrderCard,
     ProductCard,
     ReviewCard,
+    UpdatePendingActionRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -330,7 +331,7 @@ async def chat_stream(
             if tool_data:
                 end_data["tool_results"] = tool_data
 
-            # 检查是否有待确认的破坏性操作
+            # 检查是否有待确认的破坏性操作（在持久化之前，以便一起保存）
             username_for_pending = user.username if user else "anonymous"
             pending = pending_action_store.get_pending_for_request(username_for_pending)
             if pending:
@@ -340,7 +341,7 @@ async def chat_stream(
             # ⚠️ 持久化必须在 yield 之前！
             # 前端收到 done 事件后会关闭 SSE 连接，之后的代码不会执行
             await session_store.add_message(username, session_id, user_msg)
-            await session_store.add_message(username, session_id, AIMessage(content=full_reply), tool_results=tool_data)
+            await session_store.add_message(username, session_id, AIMessage(content=full_reply), tool_results=tool_data, pending_actions=pending or None)
 
             # 异步提取用户画像（不阻塞 SSE 流）
             if user and user.username:
@@ -452,6 +453,23 @@ async def confirm_action(
         message=result_text,
         tool_name=tool_name,
     )
+
+
+@router.post("/action/update-status")
+async def update_pending_action_status(
+    request: UpdatePendingActionRequest,
+    user: CurrentUser | None = Depends(get_optional_user),
+):
+    """持久化 pending_action 的确认状态（前端确认/取消后调用）。"""
+    username = user.username if user else "anonymous"
+    updated = await session_store.update_pending_action_status(
+        username=username,
+        session_id=request.session_id,
+        action_id=request.action_id,
+        status=request.status,
+        result_message=request.result_message,
+    )
+    return {"success": updated}
 
 
 # ── 辅助函数 ──────────────────────────────────────────

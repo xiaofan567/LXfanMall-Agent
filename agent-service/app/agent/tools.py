@@ -205,14 +205,21 @@ def _wrap_destructive(original_tool_fn):
     tool_name = original_tool_fn.name
 
     async def wrapped_fn(**kwargs):
+        # LangChain 调用 @tool 包装的函数时，会把参数包在 'kwargs' key 里传入
+        # 例如 wrapped_fn(kwargs={'order_id': 89, ...}) 而非 wrapped_fn(order_id=89, ...)
+        # 需要解包才能拿到真正的参数
+        actual_params = kwargs
+        if len(kwargs) == 1 and "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
+            actual_params = kwargs["kwargs"]
+
         # 构建描述
-        description = _build_tool_description(tool_name, kwargs)
+        description = _build_tool_description(tool_name, actual_params)
         username = _get_member_username()
 
         # 存入待确认队列
         action_id = pending_action_store.put(
             tool_name=tool_name,
-            params=kwargs,
+            params=actual_params,
             description=description,
             username=username,
         )
@@ -1185,6 +1192,18 @@ async def execute_confirmed_tool(tool_name: str, params: dict[str, Any], token: 
 
     # 获取原始工具函数（如果是 wrapped 版本，取 _original_tool）
     original_fn = getattr(fn, '_original_tool', fn)
+
+    # 字段名别名映射：LLM 常用的字段名 → Pydantic schema 实际字段名
+    _FIELD_ALIASES: dict[str, str] = {
+        "rating": "star",
+        "item_id": "order_item_id",
+        "review_content": "content",
+        "review_star": "star",
+        "score": "star",
+    }
+    for alias, actual in _FIELD_ALIASES.items():
+        if alias in params and actual not in params:
+            params[actual] = params.pop(alias)
 
     try:
         # LangChain @tool 包装的函数需要通过 .invoke() 调用

@@ -1,6 +1,7 @@
 # Web Framework
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
+python-multipart>=0.0.7
 
 # LangChain v1 + LangGraph v1
 langchain>=1.0.0

@@ -59,7 +59,7 @@ class RedisSessionStore:
     # ── 序列化 ────────────────────────────────────────
 
     @staticmethod
-    def _to_dict(msg: BaseMessage, timestamp: str | None = None, tool_results: list | None = None) -> dict:
+    def _to_dict(msg: BaseMessage, timestamp: str | None = None, tool_results: list | None = None, pending_actions: list | None = None) -> dict:
         """单条 Message → 存储用 dict。"""
         role = "human" if isinstance(msg, HumanMessage) else "ai"
         d = {
@@ -69,6 +69,8 @@ class RedisSessionStore:
         }
         if tool_results:
             d["tool_results"] = tool_results
+        if pending_actions:
+            d["pending_actions"] = pending_actions
         return d
 
     @staticmethod
@@ -123,12 +125,13 @@ class RedisSessionStore:
         session_id: str,
         message: BaseMessage,
         tool_results: list | None = None,
+        pending_actions: list | None = None,
     ) -> None:
         """向指定会话追加一条消息，重置滑动过期时间，更新 latest 指针。"""
         key = self._session_key(username, session_id)
         try:
             existing_raw = await self._load_raw(username, session_id)
-            existing_raw.append(self._to_dict(message, tool_results=tool_results))
+            existing_raw.append(self._to_dict(message, tool_results=tool_results, pending_actions=pending_actions))
 
             # 限制历史长度
             max_messages = self.max_turns * SessionDefaults.MESSAGES_PER_TURN
@@ -174,8 +177,38 @@ class RedisSessionStore:
             }
             if item.get("tool_results"):
                 d["tool_results"] = item["tool_results"]
+            if item.get("pending_actions"):
+                d["pending_actions"] = item["pending_actions"]
             result.append(d)
         return result
+
+    async def update_pending_action_status(
+        self,
+        username: str,
+        session_id: str,
+        action_id: str,
+        status: str,
+        result_message: str,
+    ) -> bool:
+        """更新指定消息中某个 pending_action 的确认状态。"""
+        key = self._session_key(username, session_id)
+        try:
+            raw = await self._load_raw(username, session_id)
+            # 从后往前找，找到最近一条包含该 action_id 的 assistant 消息
+            for msg in reversed(raw):
+                if msg.get("role") != self._ROLE_AI:
+                    continue
+                for pa in msg.get("pending_actions", []):
+                    if pa.get("action_id") == action_id:
+                        pa["_status"] = status
+                        pa["_result"] = result_message
+                        serialized = json.dumps(raw, ensure_ascii=False)
+                        await self.redis.setex(key, self.ttl, serialized)
+                        return True
+            return False
+        except Exception:
+            logger.warning("更新 pending_action 状态失败 | session=%s action_id=%s", session_id, action_id, exc_info=True)
+            return False
 
     # ── 内部方法 ──────────────────────────────────────
 
