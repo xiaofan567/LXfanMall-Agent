@@ -215,10 +215,10 @@
                     <artifactId>docker-maven-plugin</artifactId>
                     <version>${docker.maven.plugin.version}</version>
                         <executions>
-                            <!--如果想在项目打包时构建镜像添加-->
+                            <!--如果想在项目打包时构建镜像，把 none 改回 package-->
                             <execution>
                                 <id>build-image</id>
-                                <phase>package</phase>
+                                <phase>none</phase>
                                 <goals>
                                     <goal>build</goal>
                                 </goals>

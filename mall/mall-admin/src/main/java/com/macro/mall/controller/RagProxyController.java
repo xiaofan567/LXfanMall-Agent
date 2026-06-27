@@ -162,4 +162,27 @@ public class RagProxyController {
             return CommonResult.failed("获取统计信息失败: " + e.getMessage());
         }
     }
+
+    @ApiOperation("获取文档切片详情")
+    @RequestMapping(value = "/documents/{fileName}/chunks", method = RequestMethod.GET)
+    @ResponseBody
+    public CommonResult<Object> getDocumentChunks(@PathVariable String fileName) {
+        try {
+            String url = agentServiceUrl + "/api/v1/rag/documents/" + fileName + "/chunks";
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url, HttpMethod.GET, null,
+                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> result = response.getBody();
+                if (Integer.valueOf(200).equals(result.get("code"))) {
+                    return CommonResult.success(result.get("data"));
+                }
+            }
+            return CommonResult.failed("获取文档切片失败");
+        } catch (Exception e) {
+            LOGGER.error("获取 RAG 文档切片代理失败", e);
+            return CommonResult.failed("获取文档切片失败: " + e.getMessage());
+        }
+    }
 }
