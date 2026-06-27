@@ -1,0 +1,216 @@
+# LXfanMall 全栈部署（基础设施 + Java应用 + Python AI + Nginx）
+# 用法: docker compose up -d --build
+# 首次部署需指定 MYSQL_ROOT_PASSWORD 环境变量，或使用默认值 root
+
+services:
+  # ==================== 基础设施 ====================
+
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql/data:/var/lib/mysql
+      - ./data/mysql/log:/var/log/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    command: redis-server --appendonly yes
+    restart: always
+    volumes:
+      - ./data/redis/data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:4
+    container_name: mongo
+    restart: always
+    volumes:
+      - ./data/mongo/db:/data/db
+    ports:
+      - "27017:27017"
+
+  rabbitmq:
+    image: rabbitmq:3.9.11-management
+    container_name: rabbitmq
+    restart: always
+    volumes:
+      - ./data/rabbitmq/data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  elasticsearch:
+    image: elasticsearch:7.17.20
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - "cluster.name=elasticsearch"
+      - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+    volumes:
+      - ./data/elasticsearch/plugins:/usr/share/elasticsearch/plugins
+      - ./data/elasticsearch/data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  milvus:
+    image: milvusdb/milvus:v2.4.0
+    container_name: milvus
+    restart: always
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_USE_EMBED: "true"
+      COMMON_STORAGETYPE: "local"
+    volumes:
+      - ./data/milvus:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    restart: always
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./data/minio/data:/data
+    environment:
+      - "MINIO_ROOT_USER=minioadmin"
+      - "MINIO_ROOT_PASSWORD=minioadmin"
+    ports:
+      - "9090:9000"
+      - "9001:9001"
+
+  # ==================== Java 应用 ====================
+
+  mall-admin:
+    build:
+      context: ./mall-admin
+      dockerfile: Dockerfile
+    image: mall/mall-admin:1.0
+    container_name: mall-admin
+    restart: always
+    env_file:
+      - ./mall.env
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data/logs/mall-admin:/var/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  mall-portal:
+    build:
+      context: ./mall-portal
+      dockerfile: Dockerfile
+    image: mall/mall-portal:1.0
+    container_name: mall-portal
+    restart: always
+    env_file:
+      - ./mall.env
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data/logs/mall-portal:/var/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+
+  mall-search:
+    build:
+      context: ./mall-search
+      dockerfile: Dockerfile
+    image: mall/mall-search:1.0
+    container_name: mall-search
+    restart: always
+    ports:
+      - "8081:8081"
+    env_file:
+      - ./mall.env
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data/logs/mall-search:/var/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  # ==================== Python AI 服务 ====================
+
+  agent-service:
+    build:
+      context: ../agent-service
+      dockerfile: Dockerfile
+    image: mall/agent-service:1.0
+    container_name: agent-service
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./agent-service.env
+    volumes:
+      - ./data/agent-uploads:/app/uploads
+      - ./data/logs/agent-service:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      milvus:
+        condition: service_started
+
+  # ==================== Nginx (反向代理 + 前端静态文件) ====================
+
+  nginx:
+    image: nginx:1.22
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/nginx/html/c:/usr/share/nginx/html/c:ro
+      - ./data/nginx/html/admin:/usr/share/nginx/html/admin:ro
+      - ./data/logs/nginx:/var/log/nginx
+    depends_on:
+      - mall-admin
+      - mall-portal
+      - mall-search
+      - agent-service
