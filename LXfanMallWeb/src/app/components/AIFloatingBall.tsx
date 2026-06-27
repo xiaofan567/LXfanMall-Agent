@@ -13,8 +13,21 @@ import {
   CheckCircle2,
   Circle,
   Trash2,
+  ShieldCheck,
+  Loader2,
+  ShieldX,
 } from "lucide-react";
 import { agentApi } from "@/utils/api";
+
+// UUID 生成兼容 HTTP（crypto.randomUUID 仅 HTTPS/localhost 可用）
+function generateUUID(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 // ── 结构化数据接口（对齐后端 ChatResponse） ──
 
@@ -74,6 +87,20 @@ interface UnreviewedItem {
   product_attr?: string;
 }
 
+// ── 待确认操作 ──
+
+interface PendingAction {
+  action_id: string;
+  tool_name: string;
+  params: Record<string, unknown>;
+  description: string;
+  username: string;
+  created_at: number;
+  /** 前端状态追踪（非后端字段） */
+  _status?: "pending" | "confirming" | "confirmed" | "cancelled" | "error";
+  _result?: string;
+}
+
 // ── 消息接口 ──
 
 interface Message {
@@ -86,6 +113,7 @@ interface Message {
   addresses?: AddressCard[];
   logistics?: LogisticsCard[];
   unreviewed?: UnreviewedItem[];
+  pending_actions?: PendingAction[];
 }
 
 // ── 工具结果解析 ──
@@ -280,7 +308,7 @@ export function AIFloatingBall() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const sessionIdRef = useRef<string>(
-    localStorage.getItem("ai_session_id") || crypto.randomUUID(),
+    localStorage.getItem("ai_session_id") || generateUUID(),
   );
 
   // 持久化 session_id 到 localStorage，刷新页面后恢复对话历史
@@ -334,7 +362,12 @@ export function AIFloatingBall() {
                   addresses: addresses.length ? addresses : undefined,
                   logistics: logistics.length ? logistics : undefined,
                   unreviewed: unreviewed.length ? unreviewed : undefined,
+                  pending_actions: msg.pending_actions?.length ? msg.pending_actions : undefined,
                 };
+              }
+              // 即使没有 tool_results，也可能有 pending_actions
+              if (msg.role === "assistant" && msg.pending_actions?.length) {
+                return { ...base, pending_actions: msg.pending_actions };
               }
               return base;
             }),
@@ -392,6 +425,7 @@ export function AIFloatingBall() {
         let accumulated = "";
         let doneReply = "";
         let toolResults: ToolResult[] = [];
+        let pendingActions: PendingAction[] = [];
         let rafId = 0;
 
         const flushUI = () => {
@@ -430,6 +464,7 @@ export function AIFloatingBall() {
               if (data.done) {
                 if (data.reply) doneReply = data.reply;
                 if (data.tool_results) toolResults = data.tool_results;
+                if (data.pending_actions) pendingActions = data.pending_actions;
               }
             } catch {
               /* 忽略解析错误 */
@@ -447,6 +482,7 @@ export function AIFloatingBall() {
             if (data.done) {
               if (data.reply) doneReply = data.reply;
               if (data.tool_results) toolResults = data.tool_results;
+              if (data.pending_actions) pendingActions = data.pending_actions;
             }
           } catch {
             /* 忽略解析错误 */
@@ -477,6 +513,7 @@ export function AIFloatingBall() {
                   addresses: addresses.length ? addresses : undefined,
                   logistics: logistics.length ? logistics : undefined,
                   unreviewed: unreviewed.length ? unreviewed : undefined,
+                  pending_actions: pendingActions.length ? pendingActions : undefined,
                 }
               : m
           )
@@ -497,6 +534,77 @@ export function AIFloatingBall() {
     []
   );
 
+  const handleConfirmAction = useCallback(async (msgId: string, actionId: string) => {
+    // 设置 confirming 状态
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== msgId || !m.pending_actions) return m;
+        return {
+          ...m,
+          pending_actions: m.pending_actions.map((a) =>
+            a.action_id === actionId ? { ...a, _status: "confirming" as const } : a
+          ),
+        };
+      })
+    );
+
+    try {
+      const result = await agentApi.confirmAction(actionId);
+      const newStatus = result.success ? "confirmed" as const : "error" as const;
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msgId || !m.pending_actions) return m;
+          return {
+            ...m,
+            pending_actions: m.pending_actions.map((a) =>
+              a.action_id === actionId
+                ? {
+                    ...a,
+                    _status: newStatus,
+                    _result: result.message,
+                  }
+                : a
+            ),
+          };
+        })
+      );
+      // 持久化确认状态到后端，刷新后可恢复
+      agentApi.updatePendingActionStatus(sessionIdRef.current, actionId, newStatus, result.message);
+    } catch {
+      const errorMsg = "网络错误，请稍后重试";
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msgId || !m.pending_actions) return m;
+          return {
+            ...m,
+            pending_actions: m.pending_actions.map((a) =>
+              a.action_id === actionId
+                ? { ...a, _status: "error" as const, _result: errorMsg }
+                : a
+            ),
+          };
+        })
+      );
+      agentApi.updatePendingActionStatus(sessionIdRef.current, actionId, "error", errorMsg);
+    }
+  }, []);
+
+  const handleCancelAction = useCallback((msgId: string, actionId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== msgId || !m.pending_actions) return m;
+        return {
+          ...m,
+          pending_actions: m.pending_actions.map((a) =>
+            a.action_id === actionId ? { ...a, _status: "cancelled" as const } : a
+          ),
+        };
+      })
+    );
+    // 持久化取消状态到后端
+    agentApi.updatePendingActionStatus(sessionIdRef.current, actionId, "cancelled", "");
+  }, []);
+
   const handleQuickQuestion = useCallback(
     (question: string) => {
       if (!isOpen) {
@@ -512,7 +620,7 @@ export function AIFloatingBall() {
     // 清空后端 session
     await agentApi.clearHistory(sessionIdRef.current);
     // 生成新 session_id，断开与旧 session 的关联
-    const newId = crypto.randomUUID();
+    const newId = generateUUID();
     sessionIdRef.current = newId;
     localStorage.setItem("ai_session_id", newId);
     // 重置为欢迎消息
@@ -951,6 +1059,85 @@ export function AIFloatingBall() {
                                   </div>
                                 </div>
                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ── 待确认操作卡片 ── */}
+                      {msg.pending_actions && msg.pending_actions.length > 0 && (
+                        <div className="w-full space-y-2">
+                          {msg.pending_actions.map((action) => (
+                            <div
+                              key={action.action_id}
+                              className={`border rounded-xl p-3 shadow-sm w-full transition-all ${
+                                action._status === "confirmed"
+                                  ? "border-green-200 bg-green-50/50"
+                                  : action._status === "error"
+                                  ? "border-red-200 bg-red-50/50"
+                                  : action._status === "cancelled"
+                                  ? "border-gray-200 bg-gray-50/50 opacity-60"
+                                  : "border-orange-200 bg-orange-50/30"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                {action._status === "confirmed" ? (
+                                  <CheckCircle2 size={14} className="text-green-500" />
+                                ) : action._status === "error" ? (
+                                  <ShieldX size={14} className="text-red-500" />
+                                ) : action._status === "cancelled" ? (
+                                  <Circle size={14} className="text-gray-400" />
+                                ) : (
+                                  <ShieldCheck size={14} className="text-orange-500" />
+                                )}
+                                <span className="text-xs font-semibold text-gray-700">
+                                  {action._status === "confirmed"
+                                    ? "已确认执行"
+                                    : action._status === "error"
+                                    ? "执行失败"
+                                    : action._status === "cancelled"
+                                    ? "已取消"
+                                    : "需要确认"}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-600 mb-2">
+                                {action.description}
+                              </div>
+                              {action._result && (
+                                <div
+                                  className={`text-xs mb-2 ${
+                                    action._status === "confirmed"
+                                      ? "text-green-600"
+                                      : "text-red-500"
+                                  }`}
+                                >
+                                  {action._result}
+                                </div>
+                              )}
+                              {(!action._status || action._status === "pending") && (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleConfirmAction(msg.id, action.action_id)}
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#e02020] text-white text-xs font-medium rounded-lg hover:bg-[#c01010] transition-colors"
+                                  >
+                                    <CheckCircle2 size={12} />
+                                    确认执行
+                                  </button>
+                                  <button
+                                    onClick={() => handleCancelAction(msg.id, action.action_id)}
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                                  >
+                                    <X size={12} />
+                                    取消
+                                  </button>
+                                </div>
+                              )}
+                              {action._status === "confirming" && (
+                                <div className="flex items-center justify-center gap-2 py-1.5 text-xs text-gray-500">
+                                  <Loader2 size={14} className="animate-spin" />
+                                  正在执行...
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

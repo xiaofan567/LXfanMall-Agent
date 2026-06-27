@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { toast } from 'sonner'
 
 // 创建 axios 实例 - mall-portal 后端 API (端口8085)
 const api = axios.create({
@@ -58,7 +59,7 @@ const errorInterceptor = (error: any) => {
         }
         break
       case 403:
-        console.error('权限不足')
+        toast.error('演示模式，禁止修改数据')
         break
       case 404:
         console.error('资源不存在')
@@ -473,6 +474,36 @@ export const agentApi = {
         },
       },
     )
+  },
+
+  /** 确认并执行待确认的破坏性操作 */
+  confirmAction: async (actionId: string): Promise<{ success: boolean; message: string; tool_name: string }> => {
+    const baseURL = import.meta.env.VITE_AGENT_API_BASE_URL || '/agent-api'
+    const token = localStorage.getItem('token')
+    const res = await fetch(`${baseURL}/api/v1/chat/action/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ action_id: actionId }),
+    })
+    if (!res.ok) throw new Error(`Confirm action error: ${res.status}`)
+    return res.json()
+  },
+
+  /** 持久化 pending_action 的确认状态（确认/取消后调用，刷新后可恢复） */
+  updatePendingActionStatus: async (sessionId: string, actionId: string, status: string, resultMessage: string): Promise<void> => {
+    const baseURL = import.meta.env.VITE_AGENT_API_BASE_URL || '/agent-api'
+    const token = localStorage.getItem('token')
+    await fetch(`${baseURL}/api/v1/chat/action/update-status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ session_id: sessionId, action_id: actionId, status, result_message: resultMessage }),
+    })
   },
 }
 

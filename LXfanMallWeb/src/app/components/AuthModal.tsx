@@ -184,9 +184,14 @@ export function AuthModal() {
                     </div>
                   </form>
 
-                  <div className="mt-8 text-center text-sm text-gray-500">
-                    还没有账号？{" "}
-                    <button onClick={() => setMode("register")} className="text-[#e02020] font-medium hover:underline">免费注册</button>
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                    <div className="font-medium mb-1">🎮 演示模式</div>
+                    <div>账号：<code className="bg-amber-100 px-1.5 py-0.5 rounded text-amber-900 font-mono">xiaofan</code></div>
+                    <div>密码：<code className="bg-amber-100 px-1.5 py-0.5 rounded text-amber-900 font-mono">xiaofan</code></div>
+                  </div>
+
+                  <div className="mt-4 text-center text-sm text-gray-400">
+                    演示模式下不支持注册新账号
                   </div>
                 </>
               ) : (
