@@ -102,7 +102,7 @@ graph TD
 
 - **LangGraph 有向图工作流**：意图分类 → 节点路由 → 工具调用 → 结果整合
 - **工具调用**：商品搜索、订单查询、购物车操作、商品评价等电商工具
-<img src="document/resource/智能客服演示.bmp" alt="00" style="zoom:50%;" />
+<img src="document/resource/智能客服演示.png" alt="智能客服演示" width="600" />
 - **RAG 检索增强**：支持 PDF/Word/Excel/HTML/Markdown 多格式文档解析，Milvus 向量检索 + 重排序
 ![RAG 知识库](document/resource/image.png)
 ![RAG 文档管理](document/resource/image-1.png)
