@@ -169,11 +169,11 @@ async function fetchDetail() {
   if (!fileName.value) return
   loading.value = true
   try {
-    const res = await getRagDocumentChunksAPI(fileName.value)
-    if (res) {
-      detail.file_name = res.file_name
-      detail.chunks_count = res.chunks_count
-      detail.chunks = res.chunks ?? []
+    const res = await getRagDocumentChunksAPI(fileName.value) as any
+    if (res?.data) {
+      detail.file_name = res.data.file_name
+      detail.chunks_count = res.data.chunks_count
+      detail.chunks = res.data.chunks ?? []
     }
   } catch {
     // handled by interceptor

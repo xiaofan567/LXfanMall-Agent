@@ -255,7 +255,7 @@ async function submitUpload() {
     const res = await uploadRagDocumentAPI({
       file: selectedFile.value,
       strategy: uploadForm.strategy,
-    })
+    }) as any
     ElMessage.success(`上传成功，共 ${res?.chunk_count ?? 0} 个分块`)
     dialogVisible.value = false
     getList()

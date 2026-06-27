@@ -55,12 +55,21 @@ http.interceptors.response.use(
   },
   error => {
     // 全局处理异常请求
-    console.log('error' + error)
-    ElMessage({
-      message: error.message,
-      type: 'error',
-      duration: 3 * 1000,
-    })
+    const { response } = error
+    if (response?.status === 403) {
+      ElMessage({
+        message: '演示模式，禁止修改数据',
+        type: 'warning',
+        duration: 3 * 1000,
+      })
+    } else {
+      console.log('error' + error)
+      ElMessage({
+        message: error.message,
+        type: 'error',
+        duration: 3 * 1000,
+      })
+    }
     return Promise.reject(error)
   },
 )
